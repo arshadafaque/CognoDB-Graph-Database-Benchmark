@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+myenv/
+
+# Environment variables
+.env
+
+# Raw datasets
+data/raw/
+
+# Generated benchmark data
+data/benchmark/
+
+# Benchmark results
+results/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

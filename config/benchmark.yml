@@ -1,0 +1,51 @@
+dataset:
+  name: "SNAP soc-Pokec"
+  source: "https://snap.stanford.edu/data/soc-Pokec.html"
+
+  raw_relationships:
+    path: "data/raw/snap_pokec/soc-pokec-relationships.txt.gz"
+
+  raw_profiles:
+    path: "data/raw/snap_pokec/soc-pokec-profiles.txt.gz"
+
+  sampling:
+    relationship_count: 100000
+    seed: 42
+
+  start_nodes:
+    count: 100
+    seed: 12345
+
+  output:
+    directory: "data/benchmark"
+    nodes: "data/benchmark/nodes.csv"
+    relationships: "data/benchmark/relationships.csv"
+    start_nodes: "data/benchmark/start_nodes.csv"
+    manifest: "data/benchmark/manifest.json"
+
+
+benchmark:
+  warmup_iterations: 20
+  measurement_iterations: 100
+
+  traversal:
+    depths:
+      - 1
+      - 2
+      - 3
+
+  lookup:
+    point_lookup: true
+    filtered_lookup: true
+
+  aggregation:
+    enabled: true
+
+  mixed_workload:
+    enabled: true
+    read_percentage: 70
+    write_percentage: 30
+    concurrency:
+      - 1
+      - 10
+      - 40
