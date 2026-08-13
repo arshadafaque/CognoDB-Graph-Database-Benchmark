@@ -131,7 +131,6 @@ The resulting benchmark dataset is validated for:
 │       ├── mixed_workload.py
 │       └── resource_metrics.py
 │
-├── .env
 ├── .gitignore
 ├── requirements.txt
 └── README.md
