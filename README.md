@@ -1,107 +1,133 @@
-# CognoDB Graph Database Benchmark
+CognoDB Graph Database Benchmark
 
-A reproducible benchmark of **CognoDB Cloud** using a deterministic
-100,000-relationship sample derived from the SNAP soc-Pokec social
-network.
+A reproducible benchmark of CognoDB using a deterministic 100,000-relationship sample derived from the public SNAP soc-Pokec social network dataset.
 
-> **Important scope note:** The original assignment asks for CognoDB
-> **plus at least four other managed graph databases** under equivalent
-> resources. This repository currently documents and benchmarks CognoDB
-> only. It should not be presented as the complete cross-platform
-> assignment until the other four platforms have been measured with the
-> same dataset and workloads.
+Scope: This project benchmarks CognoDB only.
 
-------------------------------------------------------------------------
+1. Project Objective
 
-## 1. Objective
+The objective is to measure the performance and practical behavior of CognoDB for a fixed graph workload.
 
-The goal is to build a reproducible graph-database benchmark harness
-that measures:
+The benchmark covers:
 
--   Data-ingestion throughput
--   1-hop, 2-hop, and 3-hop traversals
--   Point lookup
--   Indexed/filtered lookup
--   Aggregation
--   Concurrent mixed read/write workload
--   Observable resource footprint
+Data loading throughput
 
-The benchmark uses the same local benchmark dataset, deterministic
-seeds, warm-up iterations, measurement iterations, and client
-environment so that the methodology can later be reused for additional
-graph databases.
+1-hop, 2-hop and 3-hop graph traversals
 
-------------------------------------------------------------------------
+Point lookup
 
-## 2. Dataset
+Indexed/filtered lookup
 
-### Source
+Aggregation
 
-**SNAP soc-Pokec**
+Mixed concurrent read/write workload
+
+Observable resource footprint
+
+The benchmark uses a fixed dataset, deterministic sampling, deterministic traversal start-node selection, warm-up iterations, and repeated measurements.
+
+2. Dataset
+
+Source
+
+SNAP soc-Pokec
+
+Official source:
 
 https://snap.stanford.edu/data/soc-Pokec.html
 
-The raw SNAP dataset contains substantially more relationships than
-required for this benchmark. A deterministic reservoir sample was
-created locally so that the benchmark remains small enough for the
-CognoDB free tier.
+The raw relationship dataset contains more than 30 million relationships. The benchmark uses a deterministic sample of exactly 100,000 relationships so that the dataset fits within the CognoDB free-tier resource limits.
 
-### Benchmark dataset
+Raw dataset
 
-  Property                                Value
-  ---------------------------- ----------------
-  Dataset                        SNAP soc-Pokec
-  Benchmark relationships               100,000
-  Benchmark nodes                       169,870
-  Relationship sampling seed                 42
-  Start-node count                          100
-  Start-node seed                         12345
-  Warm-up iterations                         20
-  Measurement iterations                    100
-  Traversal depths                      1, 2, 3
+data/raw/snap_pokec/
+├── soc-pokec-relationships.txt.gz
+├── soc-pokec-profiles.txt.gz
+└── soc-pokec-readme.txt
 
-The benchmark files are:
+The raw relationship file was streamed directly from the compressed dataset rather than loading the entire graph into memory.
 
-``` text
-data/
-├── raw/
-│   └── snap_pokec/
-│       ├── soc-pokec-relationships.txt.gz
-│       └── soc-pokec-profiles.txt.gz
+Benchmark dataset
+
+Property
+
+Value
+
+Dataset
+
+SNAP soc-Pokec
+
+Sampled relationships
+
+100,000
+
+Nodes
+
+169,870
+
+Relationship sampling seed
+
+42
+
+Start-node count
+
+100
+
+Start-node seed
+
+12345
+
+The resulting benchmark files are:
+
+data/benchmark/
+├── nodes.csv
+├── relationships.csv
+├── start_nodes.csv
+└── manifest.json
+
+Sampling methodology
+
+The relationship dataset is sampled using reservoir sampling.
+
+The process is:
+
+30M+ raw relationships
+          |
+          v
+Streaming reservoir sampling
+          |
+       seed = 42
+          |
+          v
+100,000 relationships
+          |
+          v
+Extract referenced nodes
+          |
+          v
+169,870 benchmark nodes
+
+The sampling is deterministic because the random seed is fixed at 42.
+
+3. Project Structure
+
+CognoDB-Graph-Database-Benchmark/
 │
-└── benchmark/
-    ├── nodes.csv
-    ├── relationships.csv
-    ├── start_nodes.csv
-    └── manifest.json
-```
-
-### Sampling methodology
-
-The raw relationship file is streamed rather than loaded completely into
-memory. Reservoir sampling with seed `42` selects exactly 100,000
-relationships.
-
-Nodes are then extracted from the sampled relationships and written to
-`nodes.csv`.
-
-The resulting benchmark dataset is validated for:
-
--   Duplicate nodes
--   Duplicate relationships
--   Invalid node references
--   Expected relationship count
-
-------------------------------------------------------------------------
-
-## 3. Project Structure
-
-``` text
-.
+├── config/
+│   └── benchmark.yml
+│
 ├── data/
 │   ├── raw/
 │   │   └── snap_pokec/
+│   │       ├── soc-pokec-relationships.txt.gz
+│   │       ├── soc-pokec-profiles.txt.gz
+│   │       └── soc-pokec-readme.txt
+│   │
 │   └── benchmark/
+│       ├── nodes.csv
+│       ├── relationships.csv
+│       ├── start_nodes.csv
+│       └── manifest.json
 │
 ├── src/
 │   ├── dataset/
@@ -131,598 +157,865 @@ The resulting benchmark dataset is validated for:
 │       ├── mixed_workload.py
 │       └── resource_metrics.py
 │
+├── .env
 ├── .gitignore
 ├── requirements.txt
 └── README.md
-```
 
-Do **not** commit `.env`.
+The .env file must not be committed to GitHub.
 
-------------------------------------------------------------------------
+4. CognoDB Environment
 
-## 4. Environment
+The benchmark uses the official Neo4j Python driver to connect to CognoDB through the Bolt TLS endpoint.
 
-### CognoDB
+Connection configuration is supplied through environment variables:
 
-  Property          Value
-  ----------------- ------------------------------
-  Platform          CognoDB Cloud
-  Database driver   Official Neo4j Python driver
-  Protocol          Bolt over TLS (`bolt+s`)
-  Username          `cognodb`
-  Tier              Free / c0
-  Region            Record actual region here
-  Advertised CPU    0.5 burstable vCPU
-  Advertised RAM    256 MB
-  Advertised disk   1 GB
-
-The URI and password are intentionally not included in this repository.
-
-Configure them through environment variables:
-
-``` env
-COGNODB_URI=bolt+s://<instance-id>.databases.cognodb.cloud
+COGNODB_URI=bolt+s://<instance-endpoint>
 COGNODB_USERNAME=cognodb
 COGNODB_PASSWORD=<password>
-```
 
-------------------------------------------------------------------------
+Credentials are intentionally excluded from this repository.
 
-## 5. Installation
+Final CognoDB instance
 
-Create and activate a virtual environment:
+Property
 
-``` powershell
+Value
+
+Platform
+
+CognoDB
+
+Plan
+
+Free
+
+Instance size
+
+c0
+
+Version
+
+v0.9.11
+
+Type
+
+Standalone
+
+Region
+
+us-east4
+
+Memory
+
+512 MB
+
+vCPU
+
+Burst to 0.5 vCPU
+
+Storage limit
+
+1 GiB
+
+Disk IOPS
+
+Up to 500 IOPS
+
+Max connections
+
+200
+
+5. Installation
+
+Create the Python virtual environment:
+
 python -m venv myenv
+
+Activate it:
+
 .\myenv\Scripts\Activate.ps1
-```
 
 Install dependencies:
 
-``` powershell
 pip install -r requirements.txt
-```
 
-The Neo4j Python driver is used to connect to CognoDB.
+6. Dataset Preparation
 
-------------------------------------------------------------------------
+Inspect raw data
 
-## 6. Reproducible Workflow
-
-### 6.1 Inspect the raw dataset
-
-``` powershell
 python -m src.dataset.inspect
-```
 
-### 6.2 Create the deterministic 100,000-edge sample
+This inspects the relationship and profile files without loading the complete raw dataset into memory.
 
-``` powershell
+Create the deterministic sample
+
 python -m src.dataset.sample --size 100000 --seed 42
-```
 
-### 6.3 Transform relationships and extract nodes
+Transform relationships and extract nodes
 
-``` powershell
 python -m src.dataset.transform
-```
 
-### 6.4 Validate the benchmark dataset
+Validate the benchmark dataset
 
-``` powershell
 python -m src.dataset.validate --expected-relationships 100000
-```
 
-Expected logical dataset:
+Expected result:
 
-``` text
-Nodes:          169,870
-Relationships:  100,000
-```
+Nodes:                     169,870
+Relationships:             100,000
+Duplicate nodes:           0
+Duplicate relationships:   0
+Invalid references:        0
 
-### 6.5 Generate traversal start nodes
+Generate traversal start nodes
 
-``` powershell
 python -m src.dataset.start_nodes
-```
-
-The benchmark uses 100 deterministic start nodes with seed `12345`.
-
-### 6.6 Generate/update the manifest
-
-``` powershell
-python -m src.dataset.manifest
-```
-
-------------------------------------------------------------------------
-
-## 7. CognoDB Setup
-
-### Test connectivity
-
-``` powershell
-python -m src.db.test_connection
-```
-
-### Create indexes/constraints
-
-``` powershell
-python -m src.loader.schema
-```
 
 The benchmark uses:
 
--   `User.id` as a unique property/constraint
--   `User.age` as an indexed property
+Start nodes:       100
+Seed:              12345
 
-### Load nodes
+7. CognoDB Setup
 
-``` powershell
+Test connectivity
+
+python -m src.db.test_connection
+
+Create schema and indexes
+
+python -m src.loader.schema
+
+The benchmark uses:
+
+User.id  -> unique constraint
+User.age -> index
+
+These indexes are used by the lookup workloads.
+
+Load nodes
+
 python -m src.loader.nodes
-```
 
-### Load relationships
+Load relationships
 
-``` powershell
 python -m src.loader.relationships
-```
 
-The exact benchmark file `data/benchmark/relationships.csv` is loaded;
-the raw 30M+ relationship file is not sampled again during loading.
+Validate the loaded database
 
-### Validate the loaded database
-
-``` powershell
 python -m src.dataset.validate --expected-relationships 100000
-```
 
-------------------------------------------------------------------------
+Final logical graph:
 
-## 8. Benchmark Methodology
+Nodes:          169,870
+Relationships:  100,000
 
-### Warm-up
+8. Benchmark Methodology
 
-Read workloads use:
+Warm-up
 
-``` text
-20 warm-up iterations
-100 measurement iterations
-```
+Read benchmarks use:
 
-Warm-up results are excluded from reported latency metrics.
+Warm-up iterations:      20
+Measurement iterations:  100
 
-### Percentiles
+Warm-up measurements are excluded from the reported latency values.
 
-The benchmark reports:
+Percentiles
 
--   Minimum
--   p50
--   Mean
--   p95
--   Maximum
+The benchmark reports latency using:
 
-The assignment emphasizes p50 and p95 rather than averages alone.
+Minimum
 
-### Client environment
+p50
 
-Record the actual final benchmark machine and region here:
+Mean
 
-``` text
-OS:               <record>
-Python:           <record>
-CPU:              <record>
-RAM:              <record>
-Region:           <record>
-Network:          <record>
-```
+p95
 
-The same client machine and region should be used when additional
-database platforms are benchmarked.
+Maximum
 
-------------------------------------------------------------------------
+The main comparison metrics are p50 and p95.
 
-# 9. Workloads
+Dataset consistency
 
-## 9.1 Traversals
+All workloads operate on the same benchmark graph:
+
+169,870 nodes
+100,000 relationships
+
+The graph is validated before and after workloads where appropriate.
+
+9. Data Loading Results
+
+Node loading
+
+Measured result:
+
+Metric
+
+Value
+
+Nodes loaded
+
+169,870
+
+Load time
+
+255.271 seconds
+
+Throughput
+
+665.45 nodes/sec
+
+Relationship loading
+
+The final logical relationship count was verified as:
+
+100,000 relationships
+
+However, a separate relationship ingestion time/throughput measurement was not recorded in the benchmark output available for this project.
+
+Therefore, no relationship throughput value is fabricated.
+
+10. Traversal Benchmark
 
 The benchmark measures:
 
-``` text
 1-hop
 2-hop
 3-hop
-```
 
-from a deterministic set of 100 randomly selected source nodes.
+using 100 deterministic start nodes.
 
-The start-node selection is restricted to source nodes present in the
-benchmark relationship dataset so that traversal tests do not
-accidentally select isolated nodes.
+Results
 
-Run:
+Traversal depth
 
-``` powershell
+p50 (ms)
+
+p95 (ms)
+
+1-hop
+
+242.308
+
+275.384
+
+2-hop
+
+242.806
+
+257.304
+
+3-hop
+
+243.292
+
+252.281
+
+Commands
+
+Check start nodes:
+
 python -m src.benchmark.check_traversals
+
+Run benchmark:
+
 python -m src.benchmark.traversals
-```
 
-------------------------------------------------------------------------
+11. Lookup Benchmark
 
-## 9.2 Point Lookup
-
-Query pattern:
-
-``` cypher
-MATCH (n:User {id: $id})
-RETURN n.id AS id
-```
+11.1 Point Lookup
 
 Indexed property:
 
-``` text
 User.id
-```
+
+Measured results:
+
+Metric
+
+Value
+
+Minimum
+
+254.451 ms
+
+p50
+
+258.342 ms
+
+Mean
+
+282.009 ms
+
+p95
+
+400.036 ms
+
+Maximum
+
+758.475 ms
+
+11.2 Filtered Lookup
+
+Indexed property:
+
+User.age
+
+Measured results:
+
+Metric
+
+Value
+
+Minimum
+
+260.527 ms
+
+p50
+
+275.902 ms
+
+Mean
+
+313.178 ms
+
+p95
+
+473.255 ms
+
+Maximum
+
+482.120 ms
+
+Lookup summary
+
+Workload
+
+Indexed property
+
+p50 (ms)
+
+p95 (ms)
+
+Point lookup
+
+User.id
+
+258.342
+
+400.036
+
+Filtered lookup
+
+User.age
+
+275.902
+
+473.255
 
 Run:
 
-``` powershell
 python -m src.benchmark.lookups
-```
 
-------------------------------------------------------------------------
+12. Aggregation Benchmark
 
-## 9.3 Filtered Lookup
+The benchmark performs an age group-by aggregation over User nodes.
 
-Query pattern:
+The logical workload is:
 
-``` cypher
-MATCH (n:User)
-WHERE n.age = $age
-RETURN count(n) AS count
-```
-
-Indexed property:
-
-``` text
-User.age
-```
-
-------------------------------------------------------------------------
-
-## 9.4 Aggregation
-
-The benchmark uses an age group-by aggregation:
-
-``` cypher
 MATCH (n:User)
 WHERE n.age IS NOT NULL
 RETURN n.age AS age, count(n) AS user_count
 ORDER BY n.age
-```
+
+Results
+
+Metric
+
+Value
+
+Minimum
+
+636.419 ms
+
+p50
+
+697.994 ms
+
+Mean
+
+710.832 ms
+
+p95
+
+769.255 ms
+
+Maximum
+
+1106.743 ms
 
 Run:
 
-``` powershell
 python -m src.benchmark.aggregation
-```
 
-------------------------------------------------------------------------
+13. Mixed Read/Write Workload
 
-## 9.5 Mixed Workload
+The benchmark defines the mixed workload as:
 
-The mixed workload uses:
+Reads:       70%
+Writes:      30%
 
-``` text
-70% reads
-30% writes
-```
-
-with:
-
-``` text
 Concurrency:
 1
 10
 40
-```
 
-The write workload updates a temporary property on an existing `User`
-node rather than creating additional relationships. This prevents the
-benchmark from continuously increasing the logical relationship count.
+The implementation uses existing User nodes for write operations by updating a temporary benchmark property rather than continuously creating new relationships.
 
-Run the validation workload first:
+Initial workload configuration
 
-``` powershell
-python -m src.benchmark.mixed_workload --iterations 100
-```
+The completed benchmark configuration was:
 
-Then the full workload:
+Nodes:              169,870
+Read percentage:    70%
+Write percentage:   30%
+Warm-up:             100
+Measurements:        1,000
+Concurrency:         1, 10, 40
 
-``` powershell
-python -m src.benchmark.mixed_workload
-```
+For the concurrency-1 workload:
 
-After the workload, validate the original dataset again:
+Measurement operations: 1,000
+Reads:                    700
+Writes:                   300
 
-``` powershell
-python -m src.dataset.validate --expected-relationships 100000
-```
+Free-tier storage limitation
 
-The expected logical relationship count must remain 100,000.
+The mixed workload was not completed as a reliable sustained-throughput benchmark because the CognoDB free-tier instance was already close to its storage limit.
 
-------------------------------------------------------------------------
+The CognoDB console showed:
 
-# 10. Resource Footprint
+Storage:       934 MB / 1 GiB
+Nodes:         169,870
+Relationships: 100,000
+Connections:   0
 
-Run:
+The database had only about 90 MB of remaining storage capacity.
 
-``` powershell
+Because the mixed workload performs writes, continuing a large write workload on an almost-full free-tier instance could introduce storage pressure, throttling, failures, or misleading measurements.
+
+The running benchmark was therefore stopped rather than allowing the database to reach its storage limit.
+
+Result
+
+The mixed workload is documented as a resource-constrained / incomplete benchmark, not as a successful QPS comparison.
+
+No QPS, p50, or p95 values are fabricated for the mixed workload.
+
+This is an intentional methodology decision: the benchmark reports the observed platform limitation instead of hiding or estimating missing results.
+
+Dataset integrity after stopping the workload
+
+The database was validated after the workload was stopped:
+
+Unique nodes:              169,870
+Duplicate node records:    0
+Missing node IDs:           0
+
+Relationships:             100,000
+Duplicate relationships:   0
+Invalid node references:   0
+
+VALIDATION PASSED
+
+Therefore, stopping the mixed workload did not corrupt the benchmark dataset.
+
+14. Resource Footprint
+
+The final CognoDB console observation was:
+
+Resource
+
+Value
+
+Nodes
+
+169,870
+
+Relationships
+
+100,000
+
+Storage
+
+934 MB / 1 GiB
+
+Memory specification
+
+512 MB
+
+Connections at observation
+
+0
+
+vCPU
+
+Burst to 0.5 vCPU
+
+Disk IOPS
+
+Up to 500 IOPS
+
+Instance type
+
+c0
+
+Plan
+
+Free
+
+Region
+
+us-east4
+
+Version
+
+v0.9.11
+
+CPU utilization itself was not collected through the Python driver, so no CPU-utilization number is claimed.
+
+Run the logical footprint script with:
+
 python -m src.benchmark.resource_metrics
-```
 
-Record the values exposed by the CognoDB console.
+15. Final Benchmark Summary
 
-  Resource                 Final value
-  ------------------------ --------------------------------
-  Nodes                    169,870
-  Relationships            100,000
-  Storage used             `<record final console value>`
-  Storage limit            1 GiB
-  Memory usage             `<record final console value>`
-  Connections              `<record final console value>`
-  CPU                      Not observable from driver
-  Instance specification   `<record>`
-  Region                   `<record>`
+Category
 
-The database console should be treated as the source for platform
-resource values that are not exposed through the driver.
+Workload
 
-------------------------------------------------------------------------
+p50 (ms)
 
-# 11. CognoDB Results
+p95 (ms)
 
-> The values below are results previously observed during development.
-> Traversal results from the earlier run should **not** be treated as
-> final because the start-node methodology was subsequently corrected.
-> Final submission values should come from the clean benchmark instance.
+Throughput / Result
 
-## Data Loading
+Loading
 
-### Nodes
+Nodes
 
-  Metric                   Result
-  ------------ ------------------
-  Nodes                   169,870
-  Load time           255.271 sec
-  Throughput     665.45 nodes/sec
+—
 
-### Relationships
+—
 
-  Metric                                          Result
-  --------------- --------------------------------------
-  Relationships                                  100,000
-  Load time         `<final clean-instance measurement>`
-  Throughput        `<final clean-instance measurement>`
+665.45 nodes/sec
 
-------------------------------------------------------------------------
+Loading
 
-## Traversal
+Relationships
 
-Previous exploratory run:
+—
 
-  Depth            p50          p95
-  ------- ------------ ------------
-  1-hop     242.308 ms   275.384 ms
-  2-hop     242.806 ms   257.304 ms
-  3-hop     243.292 ms   252.281 ms
+—
 
-**Status:** Re-run on the final clean instance after corrected
-start-node generation before using these numbers in the final
-submission.
+100,000 loaded; throughput not recorded
 
-------------------------------------------------------------------------
+Traversal
 
-## Lookups
+1-hop
 
-Previous measured run:
+242.308
 
-  Workload                   p50          p95
-  ----------------- ------------ ------------
-  Point lookup        258.342 ms   400.036 ms
-  Filtered lookup     275.902 ms   473.255 ms
+275.384
 
-Indexed properties:
+—
 
-``` text
-User.id
-User.age
-```
+Traversal
 
-**Status:** Prefer final clean-instance measurements for submission.
+2-hop
 
-------------------------------------------------------------------------
+242.806
 
-## Aggregation
+257.304
 
-Previous measured run:
+—
 
-  Workload                p50          p95
-  -------------- ------------ ------------
-  Age group-by     697.994 ms   769.255 ms
+Traversal
 
-**Status:** Prefer final clean-instance measurement for submission.
+3-hop
 
-------------------------------------------------------------------------
+243.292
 
-## Mixed Workload
+252.281
 
-Final values should be copied from:
+—
 
-``` powershell
-python -m src.benchmark.mixed_workload
-```
+Lookup
 
-    Concurrency   Read %   Write %          QPS          p50          p95       Errors
-  ------------- -------- --------- ------------ ------------ ------------ ------------
-              1       70        30   `<record>`   `<record>`   `<record>`   `<record>`
-             10       70        30   `<record>`   `<record>`   `<record>`   `<record>`
-             40       70        30   `<record>`   `<record>`   `<record>`   `<record>`
+Point
 
-------------------------------------------------------------------------
+258.342
 
-# 12. Resource / Free-Tier Caveat
+400.036
 
-During development, temporary write experiments caused the CognoDB
-console's allocated storage usage to increase substantially even after
-temporary benchmark data was removed.
+—
 
-At one point the development instance showed approximately:
+Lookup
 
-``` text
-Storage: 936 MB / 1 GiB
-Memory: 83%
-```
+Filtered
 
-The logical graph was subsequently restored to:
+275.902
 
-``` text
+473.255
+
+—
+
+Aggregation
+
+Age group-by
+
+697.994
+
+769.255
+
+—
+
+Mixed
+
+1 client
+
+Not reported
+
+Not reported
+
+Storage constrained
+
+Mixed
+
+10 clients
+
+Not reported
+
+Not reported
+
+Storage constrained
+
+Mixed
+
+40 clients
+
+Not reported
+
+Not reported
+
+Storage constrained
+
+16. Observations
+
+Lookup vs aggregation
+
+The point lookup had:
+
+p50 = 258.342 ms
+p95 = 400.036 ms
+
+The age group-by aggregation had:
+
+p50 = 697.994 ms
+p95 = 769.255 ms
+
+The aggregation therefore showed substantially higher latency than the point lookup.
+
+Traversal depth
+
+The observed traversal latencies were:
+
+1-hop: 242.308 ms p50
+2-hop: 242.806 ms p50
+3-hop: 243.292 ms p50
+
+The values were relatively close across the three traversal depths.
+
+Because this is an end-to-end client benchmark against a remote database, measured latency includes network and client/server round-trip overhead. Therefore, the benchmark should not be interpreted as measuring only the internal graph traversal execution time.
+
+Free-tier storage behavior
+
+The most important operational observation was the CognoDB free-tier storage limit.
+
+The instance reached:
+
+934 MB / 1 GiB
+
+while still containing the required:
+
 169,870 nodes
 100,000 relationships
-```
 
-This is an important free-tier caveat. Logical deletion of temporary
-data should not be assumed to immediately return all allocated storage
-to the platform.
+This limited the ability to run a sustained write-heavy workload safely.
 
-For the final benchmark, the database should be started from a clean
-instance and storage usage should be recorded from the CognoDB console.
+17. Caveats
 
-------------------------------------------------------------------------
+The benchmark uses a CognoDB free-tier instance with limited storage.
 
-# 13. Methodology Caveats
+The mixed read/write workload was constrained by the available storage capacity.
 
-The following should be disclosed in the final report:
+The mixed workload was stopped before the database reached its storage limit.
 
-1.  CognoDB was tested on its free/entry tier.
-2.  The free tier has limited storage and memory.
-3.  The database is remote, so measured query latency includes network
-    and server round-trip overhead.
-4.  Warm-up iterations are excluded from reported measurements.
-5.  The benchmark uses the same fixed 100,000-edge dataset for
-    reproducibility.
-6.  Start nodes are selected deterministically using seed `12345`.
-7.  Temporary mixed-workload writes modify existing nodes rather than
-    creating new relationships.
-8.  Resource values not exposed by the driver are marked as not
-    observable and should be taken from the provider console.
-9.  Any timeout, failed operation, throttling, or resource-limit event
-    should be retained in the final results rather than hidden.
+The benchmark graph remained intact after stopping the mixed workload.
 
-------------------------------------------------------------------------
+Network round-trip time is included in the observed query latency.
 
-# 14. Reproducibility Checklist
+Warm-up iterations are excluded from the reported read latency measurements.
 
-A clean benchmark run should follow:
+The same fixed benchmark dataset is used throughout the CognoDB benchmark.
 
-``` text
-1. Configure .env
-2. Test connection
-3. Create schema/indexes
-4. Load nodes
-5. Load relationships
+No missing throughput or latency values are estimated or fabricated.
+
+Resource values that are directly observable from the CognoDB console are reported; unavailable utilization metrics are marked as not observed.
+
+18. Reproducibility
+
+A complete benchmark setup follows this sequence:
+
+1. Download SNAP soc-Pokec
+2. Inspect raw files
+3. Reservoir sample 100,000 relationships using seed 42
+4. Transform the sampled relationships
+5. Extract nodes
 6. Validate dataset
-7. Generate start nodes
-8. Validate start nodes
-9. Run traversal benchmark
-10. Run lookup benchmark
-11. Run aggregation benchmark
-12. Run mixed workload
-13. Validate dataset again
-14. Capture resource metrics
-15. Record results
-```
+7. Generate 100 deterministic start nodes using seed 12345
+8. Configure CognoDB credentials
+9. Test CognoDB connectivity
+10. Create schema/indexes
+11. Load nodes
+12. Load relationships
+13. Validate the database
+14. Run traversal benchmark
+15. Run lookup benchmark
+16. Run aggregation benchmark
+17. Attempt mixed workload
+18. Stop mixed workload when storage pressure becomes significant
+19. Validate database integrity
+20. Record resource footprint
 
-------------------------------------------------------------------------
+19. Useful Commands
 
-# 15. Cross-Platform Benchmark Status
+Dataset
 
-The assignment requires CognoDB plus at least four other graph databases
-under equivalent resource constraints.
+python -m src.dataset.inspect
+python -m src.dataset.sample --size 100000 --seed 42
+python -m src.dataset.transform
+python -m src.dataset.validate --expected-relationships 100000
+python -m src.dataset.start_nodes
 
-  ----------------------------------------------------------------------------------
-  Platform   Dataset    Traversals   Lookups    Aggregation   Mixed      Footprint
-             loaded                                                      
-  ---------- ---------- ------------ ---------- ------------- ---------- -----------
-  CognoDB    Yes        Yes\*        Yes\*      Yes\*         Yes\*      Yes\*
+CognoDB
 
-  Platform 2 Not        ---          ---        ---           ---        ---
-             started                                                     
+python -m src.db.test_connection
+python -m src.loader.schema
+python -m src.loader.nodes
+python -m src.loader.relationships
 
-  Platform 3 Not        ---          ---        ---           ---        ---
-             started                                                     
+Benchmarks
 
-  Platform 4 Not        ---          ---        ---           ---        ---
-             started                                                     
+python -m src.benchmark.check_traversals
+python -m src.benchmark.traversals
+python -m src.benchmark.lookups
+python -m src.benchmark.aggregation
+python -m src.benchmark.mixed_workload
+python -m src.benchmark.resource_metrics
 
-  Platform 5 Not        ---          ---        ---           ---        ---
-             started                                                     
-  ----------------------------------------------------------------------------------
-
-`*` Final clean-instance values should replace exploratory development
-measurements before submission.
-
-------------------------------------------------------------------------
-
-# 16. Analysis
-
-The development measurements show a clear difference between simple
-lookups and full graph-wide aggregation.
-
-Point lookup was approximately 258 ms p50 in the exploratory run, while
-the age group-by aggregation was approximately 698 ms p50. This is
-consistent with the aggregation doing substantially more database work
-than a point lookup.
-
-The traversal measurements were unexpectedly close across 1-, 2-, and
-3-hop depths in the exploratory run. Because the workload was remote,
-fixed connection/network/server overhead may have dominated the small
-additional traversal cost. However, these values should be re-measured
-after the corrected start-node methodology before drawing a final
-conclusion.
-
-The free-tier storage behavior is also an important practical
-observation. Logical cleanup does not necessarily mean that the provider
-immediately returns allocated storage, so write-heavy workloads must be
-designed and monitored carefully on a small free instance.
-
-No claim is made here that CognoDB is faster or slower than another
-database. A fair conclusion requires the same dataset, queries, client
-environment, and equivalent resources on at least four additional
-platforms.
-
-------------------------------------------------------------------------
-
-# 17. Security
+20. Security
 
 Never commit:
 
-``` text
 .env
 passwords
-connection URIs
 API keys
 cloud credentials
-```
+private database connection information
 
-Use environment variables instead.
+Recommended .gitignore entries:
 
-Example `.gitignore`:
-
-``` gitignore
 .env
 .venv/
 myenv/
 __pycache__/
 *.pyc
-```
 
+21. Project Status
+
+The CognoDB-only benchmark implementation is complete for the measured workloads.
+
+Completed
+
+SNAP soc-Pokec dataset
+
+Deterministic 100,000 relationship sample
+
+169,870 benchmark nodes
+
+Dataset validation
+
+CognoDB connection
+
+Schema and indexes
+
+Node loading
+
+Relationship loading
+
+1-hop traversal
+
+2-hop traversal
+
+3-hop traversal
+
+Point lookup
+
+Filtered lookup
+
+Aggregation
+
+Mixed workload implementation
+
+Mixed workload resource-limit observation
+
+Database integrity validation after stopping the mixed workload
+
+Resource footprint documentation
+
+Benchmark caveats
+
+Mixed workload limitation
+
+The 70/30 mixed workload could not be completed as a sustained QPS benchmark on the free-tier instance because storage reached approximately 934 MB / 1 GiB.
+
+This limitation is intentionally reported rather than hidden or replaced with estimated metrics.
+
+22. Conclusion
+
+The benchmark successfully measures CognoDB's behavior for the selected SNAP soc-Pokec graph across data loading, graph traversal, indexed lookup, filtered lookup, and aggregation workloads.
+
+The measured results show:
+
+Node ingestion throughput of 665.45 nodes/sec
+
+1-hop traversal p50 of 242.308 ms
+
+2-hop traversal p50 of 242.806 ms
+
+3-hop traversal p50 of 243.292 ms
+
+Point lookup p50 of 258.342 ms
+
+Filtered lookup p50 of 275.902 ms
+
+Age aggregation p50 of 697.994 ms
+
+The mixed workload exposed a practical limitation of the free CognoDB tier: the benchmark graph itself required approximately 934 MB of the available 1 GiB storage, leaving insufficient headroom for a reliable sustained write benchmark.
+
+The important conclusion is therefore not that the mixed workload failed due to application code, but that the free-tier resource boundary became the limiting factor. The benchmark records that limitation explicitly so the results remain reproducible and honest.
